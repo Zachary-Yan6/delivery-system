@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: delivery-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: delivery_db
+      POSTGRES_USER: zachary
+      POSTGRES_PASSWORD: zachary
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  postgres_data:

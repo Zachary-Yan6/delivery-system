@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.zachary.delivery_system.mapper.DriverLocationMapper">
+
+    <select id="selectLatestLocations"
+            resultType="com.zachary.delivery_system.dto.Location.DriverLatestLocationResponse">
+
+        SELECT DISTINCT ON (dl.driver_id)
+        dl.driver_id AS driverId,
+        d.full_name AS driverName,
+        dl.latitude,
+        dl.longitude,
+        dl.recorded_at AS recordedAt,
+        dl.received_at AS receivedAt
+        FROM driver_locations dl
+        JOIN drivers d ON d.id = dl.driver_id
+        WHERE d.active = TRUE
+        ORDER BY dl.driver_id, dl.received_at DESC
+
+    </select>
+
+</mapper>
