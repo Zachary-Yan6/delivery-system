@@ -1,17 +1,32 @@
 services:
   postgres:
-    image: postgres:17-alpine
+    image: timescale/timescaledb:latest-pg17
     container_name: delivery-postgres
     restart: unless-stopped
+    command: postgres -c shared_preload_libraries=timescaledb
     environment:
       POSTGRES_DB: delivery_db
       POSTGRES_USER: zachary
       POSTGRES_PASSWORD: zachary
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d:ro
+
+  redis:
+    image: redis:8.0-alpine
+    container_name: delivery-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: delivery-kafka
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9092:9092"
 
 volumes:
   postgres_data:

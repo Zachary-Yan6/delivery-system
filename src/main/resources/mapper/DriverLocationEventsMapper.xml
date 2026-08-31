@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zachary.delivery_system.mapper.DriverLocationEventsMapper">
+
+    <resultMap id="BaseResultMap" type="com.zachary.delivery_system.entity.DriverLocationEvents">
+            <id property="received_at" column="received_at" />
+            <id property="event_id" column="event_id" />
+            <result property="driver_id" column="driver_id" />
+            <result property="latitude" column="latitude" />
+            <result property="longitude" column="longitude" />
+            <result property="recorded_at" column="recorded_at" />
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        received_at,event_id,driver_id,latitude,longitude,recorded_at
+    </sql>
+</mapper>

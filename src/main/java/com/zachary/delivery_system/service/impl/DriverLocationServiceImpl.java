@@ -17,7 +17,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Date;
 import java.util.List;
+import com.zachary.delivery_system.event.location.DriverLocationKafkaPublisher;
+import com.zachary.delivery_system.projection.tracking.RedisLatestDriverLocationReader;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DriverLocationServiceImpl
@@ -29,6 +34,8 @@ public class DriverLocationServiceImpl
 
     private final DriverService driverService;
     private final DriverLocationMapper driverLocationMapper;
+    private final RedisLatestDriverLocationReader redisLatestDriverLocationReader;
+    private final DriverLocationKafkaPublisher driverLocationKafkaPublisher;
 
     @Override
     @Transactional
@@ -82,11 +89,27 @@ public class DriverLocationServiceImpl
         location.setReceivedAt(now);
 
         this.save(location);
+        driverLocationKafkaPublisher.publish(location);
         return location;
     }
 
+    /**
+     * firstly, fetch location in Redis. Then fallback to database
+     *
+     * @return
+     */
     @Override
     public List<DriverLatestLocationResponse> getLatestLocations() {
-        return driverLocationMapper.selectLatestLocations();
+        try {
+            return redisLatestDriverLocationReader.readLatestLocations();
+        } catch (RedisConnectionFailureException exception) {
+            log.warn(
+                    "Redis is unavailable; falling back to PostgreSQL latest locations",
+                    exception
+            );
+
+            // fall back to database
+            return driverLocationMapper.selectLatestLocations();
+        }
     }
 }
