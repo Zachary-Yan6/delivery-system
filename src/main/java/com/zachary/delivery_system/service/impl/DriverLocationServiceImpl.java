@@ -6,21 +6,24 @@ import com.zachary.delivery_system.dto.Location.DriverLocationRequest;
 import com.zachary.delivery_system.entity.AppUser;
 import com.zachary.delivery_system.entity.Driver;
 import com.zachary.delivery_system.entity.DriverLocation;
+import com.zachary.delivery_system.event.location.DriverLocationReportedEvent;
+import com.zachary.delivery_system.exception.DriverLocationAccessDeniedException;
+import com.zachary.delivery_system.exception.InvalidLocationTimestampException;
+import com.zachary.delivery_system.exception.LocationUpdateRateLimitException;
 import com.zachary.delivery_system.mapper.DriverLocationMapper;
+import com.zachary.delivery_system.service.impl.DriverLocationOutboxService;
+import com.zachary.delivery_system.projection.tracking.RedisLatestDriverLocationReader;
 import com.zachary.delivery_system.service.DriverLocationService;
 import com.zachary.delivery_system.service.DriverService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Date;
 import java.util.List;
-import com.zachary.delivery_system.event.location.DriverLocationKafkaPublisher;
-import com.zachary.delivery_system.projection.tracking.RedisLatestDriverLocationReader;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.RedisConnectionFailureException;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -34,8 +37,9 @@ public class DriverLocationServiceImpl
 
     private final DriverService driverService;
     private final DriverLocationMapper driverLocationMapper;
-    private final RedisLatestDriverLocationReader redisLatestDriverLocationReader;
-    private final DriverLocationKafkaPublisher driverLocationKafkaPublisher;
+    private final RedisLatestDriverLocationReader
+            redisLatestDriverLocationReader;
+    private final DriverLocationOutboxService outboxService;
 
     @Override
     @Transactional
@@ -43,15 +47,15 @@ public class DriverLocationServiceImpl
             AppUser currentUser,
             DriverLocationRequest request
     ) {
-        Driver driver = driverService.lambdaQuery()
-                .eq(Driver::getUserId, currentUser.getId())
-                .one();
+        /*
+         * This lock serializes location requests for the same driver.
+         * Different drivers can still upload at the same time.
+         */
+        Driver driver = findDriverForUpdate(currentUser);
 
-        if (driver == null || !Boolean.TRUE.equals(driver.getActive())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "An active driver account is required"
-            );
+        if (driver == null
+                || !Boolean.TRUE.equals(driver.getActive())) {
+            throw new DriverLocationAccessDeniedException();
         }
 
         Date now = new Date();
@@ -59,10 +63,7 @@ public class DriverLocationServiceImpl
         if (request.getRecordedAt().after(
                 new Date(now.getTime() + MAX_FUTURE_TIME_MS)
         )) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Recorded time cannot be more than five minutes in the future"
-            );
+            throw new InvalidLocationTimestampException();
         }
 
         DriverLocation latestLocation = this.lambdaQuery()
@@ -72,13 +73,10 @@ public class DriverLocationServiceImpl
                 .one();
 
         if (latestLocation != null
-                && now.getTime() - latestLocation.getReceivedAt().getTime()
+                && now.getTime()
+                - latestLocation.getReceivedAt().getTime()
                 < MINIMUM_UPDATE_INTERVAL_MS) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.TOO_MANY_REQUESTS,
-                    "Location updates may be sent only once every five seconds"
-            );
+            throw new LocationUpdateRateLimitException();
         }
 
         DriverLocation location = new DriverLocation();
@@ -88,28 +86,49 @@ public class DriverLocationServiceImpl
         location.setRecordedAt(request.getRecordedAt());
         location.setReceivedAt(now);
 
+        /*
+         * Both inserts happen inside the same PostgreSQL transaction.
+         */
         this.save(location);
-        driverLocationKafkaPublisher.publish(location);
+
+        DriverLocationReportedEvent event =
+                new DriverLocationReportedEvent(
+                        UUID.randomUUID(),
+                        driver.getId(),
+                        location.getLatitude(),
+                        location.getLongitude(),
+                        location.getRecordedAt().toInstant(),
+                        location.getReceivedAt().toInstant()
+                );
+
+        outboxService.savePending(event);
+
+        /*
+         * Do not call Kafka here.
+         * The background Outbox Publisher sends the event after commit.
+         */
         return location;
     }
 
-    /**
-     * firstly, fetch location in Redis. Then fallback to database
-     *
-     * @return
-     */
     @Override
     public List<DriverLatestLocationResponse> getLatestLocations() {
         try {
-            return redisLatestDriverLocationReader.readLatestLocations();
+            return redisLatestDriverLocationReader
+                    .readLatestLocations();
         } catch (RedisConnectionFailureException exception) {
             log.warn(
-                    "Redis is unavailable; falling back to PostgreSQL latest locations",
+                    "Redis is unavailable; falling back to PostgreSQL",
                     exception
             );
 
-            // fall back to database
             return driverLocationMapper.selectLatestLocations();
         }
+    }
+
+    private Driver findDriverForUpdate(AppUser currentUser) {
+        return driverService.lambdaQuery()
+                .eq(Driver::getUserId, currentUser.getId())
+                .last("FOR UPDATE")
+                .one();
     }
 }

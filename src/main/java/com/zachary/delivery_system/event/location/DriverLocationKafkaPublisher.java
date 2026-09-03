@@ -1,54 +1,67 @@
 package com.zachary.delivery_system.event.location;
 
-import com.zachary.delivery_system.entity.DriverLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Component
 public class DriverLocationKafkaPublisher {
 
     private static final Logger log =
-            LoggerFactory.getLogger(DriverLocationKafkaPublisher.class);
+            LoggerFactory.getLogger(
+                    DriverLocationKafkaPublisher.class
+            );
 
-    private final KafkaTemplate<String, DriverLocationReportedEvent> kafkaTemplate;
+    private final KafkaTemplate<
+            String,
+            DriverLocationReportedEvent
+            > kafkaTemplate;
+
     private final String topicName;
 
     public DriverLocationKafkaPublisher(
             KafkaTemplate<String, DriverLocationReportedEvent> kafkaTemplate,
-            @Value("${app.kafka.topics.driver-location-reported}") String topicName
+            @Value("${app.kafka.topics.driver-location-reported}")
+            String topicName
     ) {
         this.kafkaTemplate = kafkaTemplate;
         this.topicName = topicName;
     }
 
-    public void publish(DriverLocation location) {
-        DriverLocationReportedEvent event =
-                new DriverLocationReportedEvent(
-                        UUID.randomUUID(),
-                        location.getDriverId(),
-                        location.getLatitude(),
-                        location.getLongitude(),
-                        location.getRecordedAt().toInstant(),
-                        location.getReceivedAt().toInstant()
-                );
+    /**
+     * Wait for Kafka acknowledgement before marking an outbox event published.
+     */
+    public void publish(DriverLocationReportedEvent event) {
+        try {
+            kafkaTemplate.send(
+                    topicName,
+                    event.driverId().toString(),
+                    event
+            ).get(10, TimeUnit.SECONDS);
 
-        kafkaTemplate.send(
-                topicName,
-                location.getDriverId().toString(),
-                event
-        ).whenComplete((result, exception) -> {
-            if (exception != null) {
-                log.error(
-                        "Could not publish location event for driver {}",
-                        location.getDriverId(),
-                        exception
-                );
-            }
-        });
+            log.debug(
+                    "Published location event {} for driver {}",
+                    event.eventId(),
+                    event.driverId()
+            );
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+
+            throw new IllegalStateException(
+                    "Kafka publishing was interrupted",
+                    exception
+            );
+        } catch (ExecutionException | TimeoutException exception) {
+            throw new IllegalStateException(
+                    "Could not publish driver-location event to Kafka",
+                    exception
+            );
+        }
     }
 }

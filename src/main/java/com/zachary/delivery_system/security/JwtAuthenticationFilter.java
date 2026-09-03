@@ -39,6 +39,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        // token you extract from the frontend
         String token = authorizationHeader.substring(7);
 
         try {
@@ -59,8 +60,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     var authentication =
                             new UsernamePasswordAuthenticationToken(
+                                    // principal
                                     user,
+                                    // credential
                                     null,
+                                    // authorities
                                     authorities
                             );
 
@@ -71,7 +75,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     SecurityContextHolder.getContext()
                             .setAuthentication(authentication);
-                    System.out.println("JWT authorities: " + authorities);
+
                 }
             }
         } catch (JwtException | IllegalArgumentException ignored) {

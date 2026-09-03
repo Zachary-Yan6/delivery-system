@@ -2,18 +2,21 @@ package com.zachary.delivery_system.service.impl;
 
 import com.zachary.delivery_system.dto.Delivery.DeliveryEtaResponse;
 import com.zachary.delivery_system.entity.Delivery;
+import com.zachary.delivery_system.exception.DeliveryDestinationMissingException;
+import com.zachary.delivery_system.exception.DeliveryEtaUnavailableException;
+import com.zachary.delivery_system.exception.DeliveryNotFoundException;
+import com.zachary.delivery_system.exception.RoutePlanningException;
+import com.zachary.delivery_system.exception.RouteServiceUnavailableException;
 import com.zachary.delivery_system.service.DeliveryEtaService;
 import com.zachary.delivery_system.service.DeliveryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
@@ -43,35 +46,27 @@ public class DeliveryEtaServiceImpl implements DeliveryEtaService {
         Delivery delivery = deliveryService.getById(deliveryId);
 
         if (delivery == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Delivery not found: " + deliveryId
-            );
+            throw new DeliveryNotFoundException(deliveryId);
         }
 
         if (delivery.getDriverId() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new DeliveryEtaUnavailableException(
                     "ETA is unavailable because this delivery has no assigned driver."
             );
         }
 
-        if (!"ASSIGNED".equals(delivery.getStatus())
-                && !"IN_TRANSIT".equals(delivery.getStatus())) {
+        if (delivery.getStatus() == null
+                || !delivery.getStatus().countsTowardDriverWorkload()) {
 
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "ETA is available only for assigned or in-transit deliveries."
+            throw new DeliveryEtaUnavailableException(
+                    "ETA is available only while a driver is actively handling the delivery."
             );
         }
 
         if (delivery.getDestinationLatitude() == null
                 || delivery.getDestinationLongitude() == null) {
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "ETA is unavailable because this delivery has no destination pin."
-            );
+            throw new DeliveryDestinationMissingException(deliveryId);
         }
 
         if (fixedSpeedKph <= 0) {
@@ -88,8 +83,7 @@ public class DeliveryEtaServiceImpl implements DeliveryEtaService {
                 );
 
         if (latestLocation.isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new DeliveryEtaUnavailableException(
                     "ETA is unavailable because the driver has not reported a current location."
             );
         }
@@ -158,22 +152,19 @@ public class DeliveryEtaServiceImpl implements DeliveryEtaService {
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientResponseException exception) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_CALCULATION_FAILED",
                     "OSRM could not calculate a route for this driver and destination."
             );
         } catch (RestClientException exception) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "The route service is temporarily unavailable."
-            );
+            throw new RouteServiceUnavailableException();
         }
 
         if (osrmResponse == null
                 || !"Ok".equals(osrmResponse.path("code").asText())) {
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_NOT_FOUND",
                     "OSRM could not find a road route for this delivery."
             );
         }
@@ -188,8 +179,7 @@ public class DeliveryEtaServiceImpl implements DeliveryEtaService {
         Object value = location.get(fieldName);
 
         if (value == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
+            throw new DeliveryEtaUnavailableException(
                     "ETA is unavailable because the driver location is incomplete."
             );
         }

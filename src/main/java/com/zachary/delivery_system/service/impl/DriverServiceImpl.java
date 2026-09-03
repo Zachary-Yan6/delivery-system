@@ -4,17 +4,18 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.zachary.delivery_system.dto.Driver.CreateDriverRequest;
 import com.zachary.delivery_system.entity.AppUser;
 import com.zachary.delivery_system.entity.Driver;
+import com.zachary.delivery_system.exception.UsernameAlreadyExistsException;
 import com.zachary.delivery_system.service.AppUserService;
 import com.zachary.delivery_system.service.DriverService;
 import com.zachary.delivery_system.mapper.DriverMapper;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
 
 /**
 * @author 22091
@@ -41,10 +42,7 @@ public class DriverServiceImpl extends ServiceImpl<DriverMapper, Driver>
                 .exists();
 
         if (usernameExists) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Username already exists"
-            );
+            throw new UsernameAlreadyExistsException();
         }
 
         AppUser user = new AppUser();
@@ -58,6 +56,16 @@ public class DriverServiceImpl extends ServiceImpl<DriverMapper, Driver>
         driver.setFullName(request.getFullName());
         driver.setPhone(request.getPhone());
         driver.setActive(true);
+        driver.setAvailable(
+                request.getAvailable() == null
+                        ? true
+                        : request.getAvailable()
+        );
+        driver.setVehicleCapacityKg(
+                request.getVehicleCapacityKg() == null
+                        ? new BigDecimal("100.00")
+                        : request.getVehicleCapacityKg()
+        );
         save(driver);
 
         return driver;

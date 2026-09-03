@@ -1,16 +1,15 @@
 package com.zachary.delivery_system.mapper;
 
+import com.zachary.delivery_system.dto.Location.DriverStaleLocationCandidate;
+import com.zachary.delivery_system.projection.analytics.DriverLocationActivityProjection;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.UUID;
-import com.zachary.delivery_system.dto.Location.DriverLocationActivityResponse;
-import org.apache.ibatis.annotations.Select;
-import com.zachary.delivery_system.dto.Location.DriverStaleLocationCandidate;
-import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 public interface DriverLocationEventsMapper {
 
     @Insert("""
@@ -53,7 +52,7 @@ public interface DriverLocationEventsMapper {
         GROUP BY e.driver_id, d.full_name
         ORDER BY "locationCount" DESC, "driverId"
         """)
-    List<DriverLocationActivityResponse> selectActivitySince(
+    List<DriverLocationActivityProjection> selectActivitySince(
             @Param("since") Instant since
     );
 
