@@ -1,14 +1,14 @@
 package com.zachary.delivery_system.service.impl;
 
 import com.zachary.delivery_system.dto.Location.DriverLocationActivityResponse;
+import com.zachary.delivery_system.exception.AnalyticsWindowInvalidException;
 import com.zachary.delivery_system.mapper.DriverLocationEventsMapper;
+import com.zachary.delivery_system.projection.analytics.DriverLocationActivityProjection;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,11 +28,26 @@ class DispatcherAnalyticsServiceImplTest {
 
     @Test
     void getLocationActivity_queriesOnlyTheRequestedTimeWindow() {
+        Instant lastReceivedAt = Instant.now();
+        DriverLocationActivityProjection projection =
+                new DriverLocationActivityProjection();
+        projection.setDriverId(7L);
+        projection.setDriverName("driver7");
+        projection.setLocationCount(12L);
+        projection.setLastReceivedAt(lastReceivedAt);
+
         List<DriverLocationActivityResponse> expected = List.of(
-                new DriverLocationActivityResponse()
+                new DriverLocationActivityResponse(
+                        7L,
+                        "driver7",
+                        12L,
+                        lastReceivedAt,
+                        true
+                )
         );
         when(driverLocationEventsMapper.selectActivitySince(any(Instant.class)))
-                .thenReturn(expected);
+                .thenReturn(List.of(projection));
+
         DispatcherAnalyticsServiceImpl service =
                 new DispatcherAnalyticsServiceImpl(driverLocationEventsMapper);
         Instant before = Instant.now().minusSeconds(15 * 60 + 1);
@@ -40,7 +55,10 @@ class DispatcherAnalyticsServiceImplTest {
         List<DriverLocationActivityResponse> result =
                 service.getLocationActivity(15);
 
+        // capture argument passed to mock method
         ArgumentCaptor<Instant> sinceCaptor = ArgumentCaptor.forClass(Instant.class);
+
+        // to check if driverLocationEventsMapper calls selectActivitySince in this test
         verify(driverLocationEventsMapper).selectActivitySince(sinceCaptor.capture());
         assertEquals(expected, result);
         assertEquals(true, sinceCaptor.getValue().isAfter(before));
@@ -52,13 +70,14 @@ class DispatcherAnalyticsServiceImplTest {
         DispatcherAnalyticsServiceImpl service =
                 new DispatcherAnalyticsServiceImpl(driverLocationEventsMapper);
 
-        ResponseStatusException exception = assertThrows(
-                ResponseStatusException.class,
+        AnalyticsWindowInvalidException exception = assertThrows(
+                AnalyticsWindowInvalidException.class,
                 () -> service.getLocationActivity(0)
         );
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
-        assertEquals("Minutes must be between 1 and 1440", exception.getReason());
+        assertEquals("ANALYTICS_WINDOW_INVALID", exception.getCode());
+        assertEquals("Minutes must be between 1 and 1440", exception.getMessage());
+        // to check if there is no call on driverLocationEventsMapper in this test
         verifyNoInteractions(driverLocationEventsMapper);
     }
 }
