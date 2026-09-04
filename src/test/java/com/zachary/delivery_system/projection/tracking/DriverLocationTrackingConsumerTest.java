@@ -1,6 +1,7 @@
 package com.zachary.delivery_system.projection.tracking;
 
 import com.zachary.delivery_system.event.location.DriverLocationReportedEvent;
+import com.zachary.delivery_system.websocket.DriverLocationWebSocketPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,11 +30,17 @@ class DriverLocationTrackingConsumerTest {
     @Mock
     private HashOperations<String, Object, Object> hashOperations;
 
+    @Mock
+    private DriverLocationWebSocketPublisher webSocketPublisher;
+
     @Test
     void updateLatestLocation_writesTheLatestLocationWithATtlAndClearsStaleAlert() {
         when(redisTemplate.opsForHash()).thenReturn(hashOperations);
         DriverLocationTrackingConsumer consumer =
-                new DriverLocationTrackingConsumer(redisTemplate);
+                new DriverLocationTrackingConsumer(
+                        redisTemplate,
+                        webSocketPublisher
+                );
         DriverLocationReportedEvent event = new DriverLocationReportedEvent(
                 UUID.fromString("b2b2a42e-0d5b-4fb1-8f4d-3285587b6b71"),
                 17L,
@@ -61,5 +68,6 @@ class DriverLocationTrackingConsumerTest {
         );
         verify(redisTemplate).delete("tracking:alert:driver:17:stale");
         verify(redisTemplate).delete("tracking:alert:driver:17:stale:lock");
+        verify(webSocketPublisher).publish(event);
     }
 }

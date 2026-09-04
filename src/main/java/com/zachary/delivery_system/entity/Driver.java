@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.util.Date;
 
 @TableName("drivers")
@@ -24,6 +26,14 @@ public class Driver {
     private String phone;
 
     private Boolean active;
+
+    private Boolean available;
+
+    @TableField("vehicle_capacity_kg")
+    private BigDecimal vehicleCapacityKg;
+
+    @Version
+    private Long version;
 
     @TableField("created_at")
     private Date createdAt;

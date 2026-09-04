@@ -1,0 +1,62 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - V3
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-test:
+    name: Build, test and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      JWT_SECRET: ci-only-jwt-secret-key-at-least-thirty-two-bytes-long
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Make Maven Wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build and run tests
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-report
+          path: target/site/jacoco/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload failed test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-test-reports
+          path: target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 14

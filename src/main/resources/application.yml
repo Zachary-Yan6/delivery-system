@@ -7,9 +7,6 @@ spring:
     username: zachary
     password: zachary
     driver-class-name: org.postgresql.Driver
-  web:
-    error:
-      include-message: always
   kafka:
     bootstrap-servers: localhost:9092
     producer:
@@ -34,11 +31,16 @@ spring:
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml
+  type-handlers-package: com.zachary.delivery_system.typehandler
   configuration:
     map-underscore-to-camel-case: true
 
 server:
   port: 8080
+
+logging:
+  pattern:
+    level: "%5p [traceId=%X{traceId:-}]"
 
 springdoc:
   api-docs:
@@ -59,6 +61,15 @@ app:
       history-projection: history-projection-v1
   eta:
     fixed-speed-kph: 30
+
+  assignment:
+    max-active-deliveries: 10
+    max-location-age-seconds: 300
+
+  outbox:
+    driver-location:
+      fixed-delay-ms: 1000
+      batch-size: 20
 routing:
   osrm:
     base-url: http://router.project-osrm.org

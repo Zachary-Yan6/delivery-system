@@ -1,9 +1,13 @@
 package com.zachary.delivery_system.controller;
 
 import com.zachary.delivery_system.dto.Driver.CreateDriverRequest;
+import com.zachary.delivery_system.dto.Driver.UpdateDriverAvailabilityRequest;
 import com.zachary.delivery_system.dto.Driver.UpdateDriverRequest;
 import com.zachary.delivery_system.entity.Delivery;
 import com.zachary.delivery_system.entity.Driver;
+import com.zachary.delivery_system.enums.DeliveryStatus;
+import com.zachary.delivery_system.exception.DriverHasActiveDeliveriesException;
+import com.zachary.delivery_system.exception.DriverNotFoundException;
 import com.zachary.delivery_system.service.DeliveryService;
 import com.zachary.delivery_system.service.DriverService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,7 +17,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -51,7 +54,25 @@ public class DriverController {
 
         driver.setFullName(request.getFullName());
         driver.setPhone(request.getPhone());
+        if (request.getVehicleCapacityKg() != null) {
+            driver.setVehicleCapacityKg(request.getVehicleCapacityKg());
+        }
+        if (request.getAvailable() != null) {
+            driver.setAvailable(request.getAvailable());
+        }
 
+        driverService.updateById(driver);
+        return driver;
+    }
+
+    @Operation(summary = "Change whether a driver is available for new work")
+    @PatchMapping("/{id}/availability")
+    public Driver updateAvailability(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateDriverAvailabilityRequest request
+    ) {
+        Driver driver = findDriver(id);
+        driver.setAvailable(request.getAvailable());
         driverService.updateById(driver);
         return driver;
     }
@@ -75,14 +96,14 @@ public class DriverController {
 
         boolean hasActiveDeliveries = deliveryService.lambdaQuery()
                 .eq(Delivery::getDriverId, id)
-                .in(Delivery::getStatus, "ASSIGNED", "IN_TRANSIT")
+                .in(
+                        Delivery::getStatus,
+                        DeliveryStatus.driverWorkloadStatuses()
+                )
                 .exists();
 
         if (hasActiveDeliveries) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Cannot deactivate a driver with active deliveries"
-            );
+            throw new DriverHasActiveDeliveriesException();
         }
 
         driver.setActive(false);
@@ -99,10 +120,7 @@ public class DriverController {
         Driver driver = driverService.getById(id);
 
         if (driver == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Driver not found: " + id
-            );
+            throw new DriverNotFoundException(id);
         }
 
         return driver;

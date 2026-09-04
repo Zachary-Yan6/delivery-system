@@ -6,17 +6,19 @@ import com.zachary.delivery_system.dto.Route.RoutePlanResponse;
 import com.zachary.delivery_system.dto.Route.RoutePointResponse;
 import com.zachary.delivery_system.dto.Route.RouteStopResponse;
 import com.zachary.delivery_system.entity.Delivery;
+import com.zachary.delivery_system.enums.DeliveryStatus;
+import com.zachary.delivery_system.exception.RoutePlanningException;
+import com.zachary.delivery_system.exception.RouteDeliveryNotFoundException;
+import com.zachary.delivery_system.exception.RouteServiceUnavailableException;
 import com.zachary.delivery_system.service.DeliveryService;
 import com.zachary.delivery_system.service.RoutePlanningService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -55,8 +57,8 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
         Driver driver = driverService.getById(request.getDriverId());
 
         if (driver == null || !Boolean.TRUE.equals(driver.getActive())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_DRIVER_UNAVAILABLE",
                     "Select an active driver for this route."
             );
         }
@@ -69,8 +71,8 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
         );
 
         if (originLocation == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_ORIGIN_MISSING",
                     "This driver has not reported a location yet."
             );
         }
@@ -78,8 +80,8 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
 
         // remove duplicates
         if (new HashSet<>(deliveryIds).size() != deliveryIds.size()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_DUPLICATE_DELIVERY",
                     "A delivery can only appear once in a route."
             );
         }
@@ -91,10 +93,7 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
 
 
         if (deliveriesById.size() != deliveryIds.size()) {
-            throw new ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "One or more selected deliveries do not exist."
-            );
+            throw new RouteDeliveryNotFoundException();
         }
 
         // list all existing deliveries
@@ -106,17 +105,17 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
         for (Delivery delivery : orderedDeliveries) {
             if (delivery.getDestinationLatitude() == null
                     || delivery.getDestinationLongitude() == null) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
+                throw new RoutePlanningException(
+                        "ROUTE_DESTINATION_MISSING",
                         "Delivery #" + delivery.getId() + " does not have a destination pin."
                 );
             }
 
-            if ("DELIVERED".equals(delivery.getStatus())
-                    || "FAILED".equals(delivery.getStatus())) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Completed deliveries cannot be added to a route."
+            if (delivery.getStatus() == null
+                    || !delivery.getStatus().canBeAddedToRoute()) {
+                throw new RoutePlanningException(
+                        "ROUTE_DELIVERY_TERMINAL",
+                        "Only deliveries that still require driver work can be added to a route."
                 );
             }
         }
@@ -152,21 +151,18 @@ public class RoutePlanningServiceImpl implements RoutePlanningService {
                     .retrieve()
                     .body(JsonNode.class);
         } catch (RestClientResponseException exception) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_CALCULATION_FAILED",
                     "OSRM could not calculate a road route for these delivery locations. "
                             + "Make sure every pin is close to a road and all stops are reachable by car."
             );
         } catch (RestClientException exception) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "The route service is temporarily unavailable."
-            );
+            throw new RouteServiceUnavailableException();
         }
 
         if (osrmResponse == null || !"Ok".equals(osrmResponse.path("code").asText())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
+            throw new RoutePlanningException(
+                    "ROUTE_NOT_FOUND",
                     "OSRM could not find a road route for these locations."
             );
         }

@@ -1,10 +1,10 @@
 package com.zachary.delivery_system.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
+import com.zachary.delivery_system.enums.DeliveryPriority;
+import com.zachary.delivery_system.enums.DeliveryStatus;
 import lombok.Data;
+import org.apache.ibatis.type.EnumTypeHandler;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -24,6 +24,12 @@ public class Delivery {
 
     private String address;
 
+    @TableField("pickup_latitude")
+    private BigDecimal pickupLatitude;
+
+    @TableField("pickup_longitude")
+    private BigDecimal pickupLongitude;
+
     @TableField("destination_latitude")
     private BigDecimal destinationLatitude;
 
@@ -33,7 +39,27 @@ public class Delivery {
     @TableField("driver_id")
     private Long driverId;
 
-    private String status;
+    /**
+     * The AppUser who owns this delivery as a customer.
+     * This is deliberately an ID from our database, not a value supplied by a JWT claim.
+     */
+    @TableField("owner_id")
+    private Long ownerId;
+
+    @TableField(value = "status", typeHandler = EnumTypeHandler.class)
+    private DeliveryStatus status;
+
+    @TableField(value = "priority", typeHandler = EnumTypeHandler.class)
+    private DeliveryPriority priority;
+
+    @TableField("package_weight_kg")
+    private BigDecimal packageWeightKg;
+
+    @TableField("time_window_start")
+    private Date timeWindowStart;
+
+    @TableField("time_window_end")
+    private Date timeWindowEnd;
 
     @TableField("created_at")
     private Date createdAt;
@@ -43,4 +69,8 @@ public class Delivery {
 
     @TableField("delivered_at")
     private Date deliveredAt;
+
+    @Version
+    @TableField("version")
+    private Long version;
 }

@@ -3,16 +3,15 @@ package com.zachary.delivery_system.controller;
 import com.zachary.delivery_system.dto.Auth.LoginRequest;
 import com.zachary.delivery_system.dto.Auth.LoginResponse;
 import com.zachary.delivery_system.entity.AppUser;
+import com.zachary.delivery_system.exception.InvalidCredentialsException;
 import com.zachary.delivery_system.security.JwtService;
 import com.zachary.delivery_system.service.AppUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,10 +34,7 @@ public class AuthController {
                 request.getPassword(),
                 user.getPasswordHash()
         )) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Invalid username or password"
-            );
+            throw new InvalidCredentialsException();
         }
 
         String token = jwtService.generateToken(user);
