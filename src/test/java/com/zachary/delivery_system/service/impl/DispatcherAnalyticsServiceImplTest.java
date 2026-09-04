@@ -80,4 +80,36 @@ class DispatcherAnalyticsServiceImplTest {
         // to check if there is no call on driverLocationEventsMapper in this test
         verifyNoInteractions(driverLocationEventsMapper);
     }
+
+    @Test
+    void getLocationActivity_rejectsAWindowLongerThanOneDay() {
+        DispatcherAnalyticsServiceImpl service =
+                new DispatcherAnalyticsServiceImpl(driverLocationEventsMapper);
+
+        assertThrows(
+                AnalyticsWindowInvalidException.class,
+                () -> service.getLocationActivity(1_441)
+        );
+
+        verifyNoInteractions(driverLocationEventsMapper);
+    }
+
+    @Test
+    void getLocationActivity_marksAnOldLatestEventOffline() {
+        DriverLocationActivityProjection projection =
+                new DriverLocationActivityProjection();
+        projection.setDriverId(8L);
+        projection.setDriverName("driver8");
+        projection.setLocationCount(3L);
+        projection.setLastReceivedAt(Instant.now().minusSeconds(60));
+        when(driverLocationEventsMapper.selectActivitySince(any(Instant.class)))
+                .thenReturn(List.of(projection));
+
+        List<DriverLocationActivityResponse> result =
+                new DispatcherAnalyticsServiceImpl(driverLocationEventsMapper)
+                        .getLocationActivity(60);
+
+        assertEquals(1, result.size());
+        assertEquals(false, result.get(0).online());
+    }
 }

@@ -22,7 +22,9 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zachary.delivery_system.dto.PageResponse;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -79,13 +81,29 @@ public class DeliveryController {
         return findDelivery(delivery.getId());
     }
 
-    @Operation(summary = "List all deliveries")
+    @Operation(summary = "List deliveries with pagination")
     @GetMapping
-    public List<Delivery> getDeliveries(
-            @AuthenticationPrincipal AppUser currentUser
+    public PageResponse<Delivery> getDeliveries(
+            @AuthenticationPrincipal AppUser currentUser,
+            @RequestParam(defaultValue = "1") long page,
+            @RequestParam(defaultValue = "10") long size
     ) {
-        return deliveryService.list(
-                deliveryAuthorizationService.visibleDeliveryQuery(currentUser)
+        Page<Delivery> pageRequest = Page.of(page, size);
+
+        IPage<Delivery> result = deliveryService.page(
+                pageRequest,
+                deliveryAuthorizationService
+                        .visibleDeliveryQuery(currentUser)
+                        .orderByDesc(Delivery::getCreatedAt)
+                        .orderByDesc(Delivery::getId)
+        );
+
+        return new PageResponse<>(
+                result.getRecords(),
+                result.getCurrent(),
+                result.getSize(),
+                result.getTotal(),
+                result.getPages()
         );
     }
 

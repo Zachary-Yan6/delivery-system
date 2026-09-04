@@ -447,6 +447,109 @@ class DeliveryServiceImplTest {
         );
     }
 
+    @Test
+    void assignDriverRejectsANullDeliveryStatus() {
+        Delivery delivery = deliveryWithStatus(null);
+        DeliveryServiceImpl service = serviceReturning(delivery);
+
+        assertThrows(
+                DeliveryAssignmentNotAllowedException.class,
+                () -> service.assignDriver(
+                        actor(2L, "dispatcher", "DISPATCHER"),
+                        5L,
+                        8L
+                )
+        );
+
+        verifyNoInteractions(driverService, auditService);
+    }
+
+    @Test
+    void lifecycleRejectsNullAndInvalidPreviousStatuses() {
+        Delivery nullStatus = deliveryWithStatus(null);
+        nullStatus.setDriverId(8L);
+        DeliveryServiceImpl nullStatusService = serviceReturning(nullStatus);
+        when(driverService.getById(8L)).thenReturn(activeDriver(8L));
+
+        assertThrows(
+                com.zachary.delivery_system.exception
+                        .DeliveryStatusTransitionException.class,
+                () -> nullStatusService.startDelivery(
+                        actor(3L, "driver", "DRIVER"),
+                        8L,
+                        5L
+                )
+        );
+
+        Delivery invalidStatus = deliveryWithStatus(DeliveryStatus.ASSIGNED);
+        invalidStatus.setDriverId(8L);
+        DeliveryServiceImpl invalidStatusService =
+                serviceReturning(invalidStatus);
+
+        assertThrows(
+                com.zachary.delivery_system.exception
+                        .DeliveryStatusTransitionException.class,
+                () -> invalidStatusService.startDelivery(
+                        actor(3L, "driver", "DRIVER"),
+                        8L,
+                        5L
+                )
+        );
+
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void driverWorkflowRejectsUnknownAndUnassignedDrivers() {
+        DeliveryServiceImpl missingDriverService = new DeliveryServiceImpl(
+                driverService,
+                auditService,
+                driverAssignmentService
+        );
+        when(driverService.getById(8L)).thenReturn(null);
+
+        assertThrows(
+                DriverNotFoundException.class,
+                () -> missingDriverService.startDelivery(
+                        actor(3L, "driver", "DRIVER"),
+                        8L,
+                        5L
+                )
+        );
+
+        Delivery assignedToAnotherDriver =
+                deliveryWithStatus(DeliveryStatus.PICKED_UP);
+        assignedToAnotherDriver.setDriverId(9L);
+        DeliveryServiceImpl wrongDriverService =
+                serviceReturning(assignedToAnotherDriver);
+        when(driverService.getById(8L)).thenReturn(activeDriver(8L));
+
+        assertThrows(
+                DeliveryAccessDeniedException.class,
+                () -> wrongDriverService.startDelivery(
+                        actor(3L, "driver", "DRIVER"),
+                        8L,
+                        5L
+                )
+        );
+
+        verifyNoInteractions(auditService);
+    }
+
+    @Test
+    void confirmDeliveryRejectsMissingActor() {
+        Delivery delivery = deliveryWithStatus(DeliveryStatus.DELIVERED);
+        delivery.setOwnerId(12L);
+        DeliveryServiceImpl service = serviceReturning(delivery);
+
+        assertThrows(
+                DeliveryAccessDeniedException.class,
+                () -> service.confirmDelivery(null, 5L)
+        );
+
+        verifyNoInteractions(auditService);
+    }
+
     private DeliveryServiceImpl serviceReturning(Delivery delivery) {
         DeliveryServiceImpl service = spy(
                 new DeliveryServiceImpl(

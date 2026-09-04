@@ -6,14 +6,17 @@
 
     <resultMap id="BaseResultMap" type="com.zachary.delivery_system.entity.Driver">
             <result property="id" column="id" />
-            <result property="user_id" column="user_id" />
-            <result property="full_name" column="full_name" />
+            <result property="userId" column="user_id" />
+            <result property="fullName" column="full_name" />
             <result property="phone" column="phone" />
             <result property="active" column="active" />
-            <result property="created_at" column="created_at" />
+            <result property="available" column="available" />
+            <result property="vehicleCapacityKg" column="vehicle_capacity_kg" />
+            <result property="version" column="version" />
+            <result property="createdAt" column="created_at" />
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,user_id,full_name,phone,active,created_at
+        id,user_id,full_name,phone,active,available,vehicle_capacity_kg,version,created_at
     </sql>
 </mapper>

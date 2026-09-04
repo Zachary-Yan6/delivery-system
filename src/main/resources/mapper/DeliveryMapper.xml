@@ -9,18 +9,31 @@
             <result property="customerName" column="customer_name" />
             <result property="customerPhone" column="customer_phone" />
             <result property="address" column="address" />
+            <result property="ownerId" column="owner_id" />
             <result property="driverId" column="driver_id" />
-            <result property="status" column="status" />
+            <result property="status" column="status"
+                    javaType="com.zachary.delivery_system.enums.DeliveryStatus"
+                    typeHandler="org.apache.ibatis.type.EnumTypeHandler" />
             <result property="createdAt" column="created_at" />
             <result property="updatedAt" column="updated_at" />
             <result property="deliveredAt" column="delivered_at" />
             <result property="destinationLongitude" column="destination_longitude" />
             <result property="destinationLatitude" column="destination_latitude" />
+            <result property="pickupLongitude" column="pickup_longitude" />
+            <result property="pickupLatitude" column="pickup_latitude" />
+            <result property="priority" column="priority"
+                    javaType="com.zachary.delivery_system.enums.DeliveryPriority"
+                    typeHandler="org.apache.ibatis.type.EnumTypeHandler" />
+            <result property="packageWeightKg" column="package_weight_kg" />
+            <result property="timeWindowStart" column="time_window_start" />
+            <result property="timeWindowEnd" column="time_window_end" />
+            <result property="version" column="version" />
     </resultMap>
 
     <sql id="Base_Column_List">
-        id,customer_name,customer_phone,address,driver_id,status,
+        id,customer_name,customer_phone,address,owner_id,driver_id,status,
         created_at,updated_at,delivered_at, destination_longitude,
-          destination_latitude
+        destination_latitude,pickup_longitude,pickup_latitude,priority,
+        package_weight_kg,time_window_start,time_window_end,version
     </sql>
 </mapper>

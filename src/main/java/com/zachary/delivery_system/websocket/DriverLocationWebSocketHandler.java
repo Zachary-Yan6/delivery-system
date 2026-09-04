@@ -35,6 +35,7 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
     private final Map<String, WebSocketSession> authenticatedSessions =
             new ConcurrentHashMap<>();
 
+   // would be called when the connection is built at first time
     @Override
     protected void handleTextMessage(
             WebSocketSession session,
@@ -87,9 +88,11 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
     }
 
     public void broadcastLocation(DriverLocationUpdateMessage location) {
+        // info you would send to frontend
         String payload;
 
         try {
+            // convert Java object into JSON string
             payload = objectMapper.writeValueAsString(
                     Map.of(
                             "type", "LOCATION_UPDATE",
@@ -103,6 +106,7 @@ public class DriverLocationWebSocketHandler extends TextWebSocketHandler {
             );
         }
 
+        // convert it into message that websocket requires
         TextMessage message = new TextMessage(payload);
 
         authenticatedSessions.forEach((sessionId, session) -> {
