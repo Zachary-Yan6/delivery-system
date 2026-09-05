@@ -1,5 +1,6 @@
 package com.zachary.delivery_system.event.location;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +26,10 @@ public class DriverLocationKafkaPublisher {
 
     private final String topicName;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "KafkaTemplate is a Spring-managed dependency that is intentionally shared."
+    )
     public DriverLocationKafkaPublisher(
             KafkaTemplate<String, DriverLocationReportedEvent> kafkaTemplate,
             @Value("${app.kafka.topics.driver-location-reported}")

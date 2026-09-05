@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zachary.delivery_system.dto.Delivery.AssignDeliveryRequest;
 import com.zachary.delivery_system.dto.Delivery.CreateDeliveryRequest;
+import com.zachary.delivery_system.dto.Delivery.CreateDeliveryResponse;
 import com.zachary.delivery_system.dto.Delivery.UpdateDeliveryRequest;
 import com.zachary.delivery_system.dto.PageResponse;
 import com.zachary.delivery_system.entity.AppUser;
@@ -58,7 +59,7 @@ class DeliveryControllerTest {
     }
 
     @Test
-    void createDeliveryAppliesDefaultsAndReturnsTheSavedDelivery() {
+    void createDeliveryAppliesDefaultsAndReturnsACreationResponse() {
         CreateDeliveryRequest request = new CreateDeliveryRequest();
         request.setOwnerId(12L);
         request.setCustomerName("Customer");
@@ -68,18 +69,19 @@ class DeliveryControllerTest {
         request.setPackageWeightKg(null);
         AtomicReference<Delivery> saved = captureSavedDelivery();
 
-        Delivery result = controller.createDelivery(request);
+        CreateDeliveryResponse result = controller.createDelivery(request);
 
-        assertSame(saved.get(), result);
-        assertEquals(12L, result.getOwnerId());
-        assertEquals("Customer", result.getCustomerName());
-        assertEquals("123", result.getCustomerPhone());
-        assertEquals("London", result.getAddress());
-        assertEquals(DeliveryPriority.NORMAL, result.getPriority());
-        assertEquals(BigDecimal.ONE, result.getPackageWeightKg());
-        assertEquals(DeliveryStatus.CREATED, result.getStatus());
-        assertNull(result.getPickupLatitude());
-        assertNull(result.getDestinationLatitude());
+        assertEquals(5L, result.id());
+        assertEquals(DeliveryStatus.CREATED, result.status());
+        assertEquals(saved.get().getCreatedAt().toInstant(), result.createdAt());
+        assertEquals(12L, saved.get().getOwnerId());
+        assertEquals("Customer", saved.get().getCustomerName());
+        assertEquals("123", saved.get().getCustomerPhone());
+        assertEquals("London", saved.get().getAddress());
+        assertEquals(DeliveryPriority.NORMAL, saved.get().getPriority());
+        assertEquals(BigDecimal.ONE, saved.get().getPackageWeightKg());
+        assertNull(saved.get().getPickupLatitude());
+        assertNull(saved.get().getDestinationLatitude());
         verify(authorizationService).validateCustomerOwner(12L);
     }
 
@@ -100,17 +102,24 @@ class DeliveryControllerTest {
         request.setTimeWindowEnd(end);
         AtomicReference<Delivery> saved = captureSavedDelivery();
 
-        Delivery result = controller.createDelivery(request);
+        CreateDeliveryResponse result = controller.createDelivery(request);
 
-        assertSame(saved.get(), result);
-        assertEquals(request.getPickupLatitude(), result.getPickupLatitude());
-        assertEquals(request.getPickupLongitude(), result.getPickupLongitude());
-        assertEquals(request.getDestinationLatitude(), result.getDestinationLatitude());
-        assertEquals(request.getDestinationLongitude(), result.getDestinationLongitude());
-        assertEquals(DeliveryPriority.HIGH, result.getPriority());
-        assertEquals(new BigDecimal("4.50"), result.getPackageWeightKg());
-        assertSame(start, result.getTimeWindowStart());
-        assertSame(end, result.getTimeWindowEnd());
+        assertEquals(5L, result.id());
+        assertEquals(DeliveryStatus.CREATED, result.status());
+        assertEquals(request.getPickupLatitude(), saved.get().getPickupLatitude());
+        assertEquals(request.getPickupLongitude(), saved.get().getPickupLongitude());
+        assertEquals(
+                request.getDestinationLatitude(),
+                saved.get().getDestinationLatitude()
+        );
+        assertEquals(
+                request.getDestinationLongitude(),
+                saved.get().getDestinationLongitude()
+        );
+        assertEquals(DeliveryPriority.HIGH, saved.get().getPriority());
+        assertEquals(new BigDecimal("4.50"), saved.get().getPackageWeightKg());
+        assertSame(start, saved.get().getTimeWindowStart());
+        assertSame(end, saved.get().getTimeWindowEnd());
     }
 
     @Test
@@ -273,6 +282,7 @@ class DeliveryControllerTest {
         when(deliveryService.save(any(Delivery.class))).thenAnswer(invocation -> {
             Delivery delivery = invocation.getArgument(0);
             delivery.setId(5L);
+            delivery.setCreatedAt(new Date(1_700_000_000_000L));
             saved.set(delivery);
             return true;
         });

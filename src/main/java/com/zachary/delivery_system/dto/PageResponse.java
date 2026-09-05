@@ -9,4 +9,8 @@ public record PageResponse<T>(
         long totalElements,
         long totalPages
 ) {
+
+    public PageResponse {
+        content = List.copyOf(content);
+    }
 }

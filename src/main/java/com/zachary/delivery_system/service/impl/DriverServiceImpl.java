@@ -10,7 +10,6 @@ import com.zachary.delivery_system.service.DriverService;
 import com.zachary.delivery_system.mapper.DriverMapper;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,9 +56,7 @@ public class DriverServiceImpl extends ServiceImpl<DriverMapper, Driver>
         driver.setPhone(request.getPhone());
         driver.setActive(true);
         driver.setAvailable(
-                request.getAvailable() == null
-                        ? true
-                        : request.getAvailable()
+                !Boolean.FALSE.equals(request.getAvailable())
         );
         driver.setVehicleCapacityKg(
                 request.getVehicleCapacityKg() == null

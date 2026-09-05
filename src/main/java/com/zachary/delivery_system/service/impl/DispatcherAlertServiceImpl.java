@@ -1,5 +1,6 @@
 package com.zachary.delivery_system.service.impl;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import com.zachary.delivery_system.dto.Location.DriverLocationAlertResponse;
 import com.zachary.delivery_system.service.DispatcherAlertService;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,10 @@ public class DispatcherAlertServiceImpl implements DispatcherAlertService {
 
     private final StringRedisTemplate redisTemplate;
 
+    @SuppressFBWarnings(
+            value = "EI_EXPOSE_REP2",
+            justification = "StringRedisTemplate is a Spring-managed dependency that is intentionally shared."
+    )
     public DispatcherAlertServiceImpl(StringRedisTemplate redisTemplate) {
         this.redisTemplate = redisTemplate;
     }

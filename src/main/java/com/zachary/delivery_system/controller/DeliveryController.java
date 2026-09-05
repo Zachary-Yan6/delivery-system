@@ -3,6 +3,7 @@ package com.zachary.delivery_system.controller;
 
 import com.zachary.delivery_system.dto.Delivery.AssignDeliveryRequest;
 import com.zachary.delivery_system.dto.Delivery.CreateDeliveryRequest;
+import com.zachary.delivery_system.dto.Delivery.CreateDeliveryResponse;
 import com.zachary.delivery_system.dto.Delivery.UpdateDeliveryRequest;
 import com.zachary.delivery_system.entity.AppUser;
 import com.zachary.delivery_system.entity.Delivery;
@@ -26,7 +27,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zachary.delivery_system.dto.PageResponse;
 import java.math.BigDecimal;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/deliveries")
@@ -41,7 +41,9 @@ public class DeliveryController {
     @Operation(summary = "Create a delivery")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED) // When this method succeeds, return this HTTP status code.
-    public Delivery createDelivery(@Valid @RequestBody CreateDeliveryRequest createDeliveryRequest) {
+    public CreateDeliveryResponse createDelivery(
+            @Valid @RequestBody CreateDeliveryRequest createDeliveryRequest
+    ) {
         deliveryAuthorizationService.validateCustomerOwner(
                 createDeliveryRequest.getOwnerId()
         );
@@ -78,7 +80,7 @@ public class DeliveryController {
         delivery.setStatus(DeliveryStatus.CREATED);
 
         deliveryService.save(delivery);
-        return findDelivery(delivery.getId());
+        return CreateDeliveryResponse.from(findDelivery(delivery.getId()));
     }
 
     @Operation(summary = "List deliveries with pagination")
